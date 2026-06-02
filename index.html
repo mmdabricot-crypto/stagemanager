@@ -324,19 +324,34 @@ function setSyncStatus(s){
   if(dot){dot.className=s;document.getElementById('sync-label').textContent=s==='sync'?'Sync…':'Firebase';}
 }
 
+// Profils par défaut (mêmes que SonoManager)
+const DEFAULT_PROFILES=[
+  {id:1,name:'Admin',color:'#1D9E75'},
+  {id:2,name:'Tech 1',color:'#185FA5'},
+  {id:3,name:'Tech 2',color:'#BA7517'},
+];
+
 // ── LOGIN ──
 function renderProfiles(){
   const list=document.getElementById('profile-list');
   if(!list)return;
-  list.innerHTML=(S.profiles||[]).map(p=>`
+  // Utiliser les profils Firebase ou les défauts si vides
+  const profiles=(S.profiles&&S.profiles.length>0)?S.profiles:DEFAULT_PROFILES;
+  list.innerHTML=profiles.map(p=>`
     <button class="profile-btn" onclick="selectProfile(${p.id})">
       <div class="profile-av" style="background:${p.color}">${p.name.charAt(0)}</div>
       ${p.name}
     </button>`).join('');
 }
 
+// Afficher les profils par défaut immédiatement sans attendre Firebase
+document.addEventListener('DOMContentLoaded',()=>{
+  renderProfiles();
+});
+
 function selectProfile(id){
-  currentUser=(S.profiles||[]).find(p=>p.id===id);
+  const profiles=(S.profiles&&S.profiles.length>0)?S.profiles:DEFAULT_PROFILES;
+  currentUser=profiles.find(p=>p.id===id);
   if(!currentUser)return;
   document.getElementById('screen-login').style.display='none';
   document.getElementById('screen-app').style.display='flex';
