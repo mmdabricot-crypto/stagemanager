@@ -447,9 +447,14 @@ function filterLib(){
 
 function bindLibDrag(){
   document.querySelectorAll('.lib-item').forEach(el=>{
-    el.addEventListener('click',()=>{
-      addElement(el.dataset.type,null,null);
-    });
+    const type=el.dataset.type;
+    // Clic = ajouter au centre de la scène
+    el.onclick=()=>{
+      if(type)addElement(type,
+        parseFloat((sceneW/2+Math.random()*2-1).toFixed(2)),
+        parseFloat((sceneH/2+Math.random()*2-1).toFixed(2))
+      );
+    };
   });
 }
 
@@ -1028,8 +1033,13 @@ function bindEvents(){
   canvas.addEventListener('mousemove',onMove);
   canvas.addEventListener('mouseup',onUp);
   canvas.addEventListener('dblclick',onDblClick);
-  canvas.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';});
-  canvas.addEventListener('drop',onDrop);
+
+  // Drag & drop — sur le canvas ET le wrapper pour couvrir tous les cas
+  [canvas, canvasWrap].forEach(el=>{
+    el.addEventListener('dragover',e=>{e.preventDefault();e.dataTransfer.dropEffect='copy';});
+    el.addEventListener('drop',onDrop);
+  });
+
   document.addEventListener('keydown',onKey);
   window.addEventListener('resize',()=>{resize();});
 }
@@ -1152,11 +1162,17 @@ function onDblClick(e){
 
 function onDrop(e){
   e.preventDefault();
-  const type=e.dataTransfer.getData('type');if(!type)return;
+  // Essayer les deux formats selon le navigateur
+  const type=e.dataTransfer.getData('type')||e.dataTransfer.getData('text/plain');
+  if(!type||type.trim()===''){console.warn('onDrop: no type received');return;}
   const r=canvas.getBoundingClientRect();
-  const p={x:e.clientX-r.left,y:e.clientY-r.top};
-  const pm=toMetre(p.x,p.y);
-  addElement(type,snapVal(pm.x),snapVal(pm.y));
+  const px=e.clientX-r.left;
+  const py=e.clientY-r.top;
+  const pm=toMetre(px,py);
+  // Forcer la position DANS la scène
+  const mx=Math.max(0.5,Math.min(sceneW-0.5,pm.x));
+  const my=Math.max(0.5,Math.min(sceneH-0.5,pm.y));
+  addElement(type.trim(),parseFloat(mx.toFixed(2)),parseFloat(my.toFixed(2)));
 }
 
 function onKey(e){
@@ -1171,7 +1187,11 @@ function onKey(e){
   if(e.key==='Escape'){selected=null;multiSel=[];draw();}
 }
 
-function onLibDrag(e,type){e.dataTransfer.setData('type',type);}
+function onLibDrag(e,type){
+  try{e.dataTransfer.setData('type',type);}catch(err){}
+  try{e.dataTransfer.setData('text/plain',type);}catch(err){}
+  e.dataTransfer.effectAllowed='copy';
+}
 
 // ── ÉLÉMENTS ──
 function addElement(type,mx,my){
