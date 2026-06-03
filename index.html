@@ -1486,8 +1486,23 @@ function onDrop(e){
   if(!type)return;
   const r=canvas.getBoundingClientRect();
   const pm=toMetre(e.clientX-r.left,e.clientY-r.top);
-  const c=clampScene(snapV(pm.x),snapV(pm.y));
-  addElement(type,c.x,c.y);
+  const cl=clampScene(snapV(pm.x),snapV(pm.y));
+  // Image personnalisée
+  if(type.startsWith('custom:')){
+    const imgId=type.slice(7);
+    const meta=(S.customImages||[]).find(i=>i.id===imgId);
+    if(!meta)return;
+    getImageForCanvas(imgId).then(()=>{
+      histPush();
+      const shortName=meta.name.length>20?meta.name.slice(0,18)+'…':meta.name;
+      elements.push({type:'custom-img',customId:imgId,x:cl.x,y:cl.y,label:shortName,color:'#888780',rotation:0,flip:false,scale:1});
+      selected=elements[elements.length-1];multiSel=[selected];
+      updatePropPanel();draw();
+      toast('✅ '+shortName);
+    });
+    return;
+  }
+  addElement(type,cl.x,cl.y);
 }
 
 function onKey(e){
@@ -1797,16 +1812,20 @@ function renderCustomLib(){
     </div>`;
     return;
   }
-  el.innerHTML=imgs.map(img=>`
-    <div style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;border-radius:6px;margin:1px 5px;transition:background .1s" 
-      class="lib-item" data-custom-id="${img.id}" onclick="addCustomElement('${img.id}')">
+  el.innerHTML=imgs.map(img=>{
+    const shortName=img.name.length>20?img.name.slice(0,18)+'…':img.name;
+    return`<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;cursor:pointer;border-radius:6px;margin:1px 5px;transition:background .1s" 
+      class="lib-item" data-custom-id="${img.id}" draggable="true"
+      onclick="addCustomElement('${img.id}')"
+      ondragstart="libDragType='custom:${img.id}';try{event.dataTransfer.setData('text','custom:${img.id}');}catch(_){}">
       <div id="thumb-${img.id}" style="width:36px;height:36px;border-radius:6px;background:var(--gray-lt);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3)">…</div>
       <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(img.name)}</div>
+        <div style="font-size:12px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(img.name)}">${esc(shortName)}</div>
         <div style="font-size:10px;color:var(--text3)">${img.cat||'Perso'}</div>
       </div>
       <button class="btn sm danger" onclick="event.stopPropagation();deleteCustomImage('${img.id}')" style="flex-shrink:0;padding:3px 6px">✕</button>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   // Charger les thumbnails
   imgs.forEach(async img=>{
     const data=await idbGet(img.id);
@@ -1838,7 +1857,11 @@ function importCustomImage(){
 
 async function processCustomImage(file){
   const id='custom_'+Date.now()+'_'+Math.random().toString(36).slice(2,6);
-  const name=file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  // Nettoyer le nom : supprimer extension, tirets/underscores → espaces, capitaliser
+  let name=file.name.replace(/\.[^.]+$/,'').replace(/[-_]/g,' ');
+  // Tronquer à 20 chars
+  if(name.length>20)name=name.slice(0,18)+'…';
+  name=name.charAt(0).toUpperCase()+name.slice(1);
   // Lire l'image
   const data=await new Promise(res=>{
     const r=new FileReader();
@@ -1895,24 +1918,16 @@ async function getImageForCanvas(id){
 function addCustomElement(imgId){
   const meta=(S.customImages||[]).find(i=>i.id===imgId);
   if(!meta)return;
-  // Charger l'image en cache
+  const shortName=meta.name.length>20?meta.name.slice(0,18)+'…':meta.name;
+  // Précharger l'image puis placer
   getImageForCanvas(imgId).then(()=>{
-    const x=parseFloat((sceneW*0.15+Math.random()*sceneW*0.7).toFixed(2));
+    const x=parseFloat((sceneW*0.2+Math.random()*sceneW*0.6).toFixed(2));
     const y=parseFloat((sceneH*0.2+Math.random()*sceneH*0.6).toFixed(2));
-    const el={
-      type:'custom-img',
-      customId:imgId,
-      x,y,
-      label:meta.name,
-      color:'#888780',
-      rotation:0,flip:false,
-      scale:1,
-    };
     histPush();
-    elements.push(el);
-    selected=el;multiSel=[el];
+    elements.push({type:'custom-img',customId:imgId,x,y,label:shortName,color:'#888780',rotation:0,flip:false,scale:1});
+    selected=elements[elements.length-1];multiSel=[selected];
     updatePropPanel();draw();
-    toast('✅ '+meta.name+' ajouté');
+    toast('✅ '+shortName);
   });
 }
 
